@@ -1,5 +1,11 @@
 <?php
 
+declare(strict_types=1);
+
+namespace SpectoDB\Core\Database;
+
+use PDO;
+
 class Database
 {
     private PDO $pdo;

@@ -11,8 +11,19 @@ return [
     ],
 
     'mapping' => [
-        'case_id' => 'order_id',
-        'event' => 'event_type',
-        'timestamp' => 'created_at',
+    'table' => 'transactions',
+    'case_id' => 'order_id',
+    'event' => 'event_type',
+    'timestamp' => 'created_at',
     ],
+
+    'analysis' => [
+    'success_events' => [
+        'payment_success',
+    ],
+
+    'failure_events' => [
+        'payment_failed',
+    ],
+],
 ];

@@ -1,0 +1,14 @@
+{
+  "name": "kraftstaus/spectodb",
+  "description": "Bachelor thesis project: SpectoDB - an open-source PHP platform for process mining and database analysis.",
+  "type": "project",
+  "license": "MIT",
+  "require": {
+    "php": ">=8.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "SpectoDB\\": "src/"
+    }
+  }
+}
