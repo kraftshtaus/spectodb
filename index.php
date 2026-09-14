@@ -10,6 +10,7 @@ use SpectoDB\Core\Database\Database;
 use SpectoDB\Core\Database\DatabaseEventSource;
 use SpectoDB\Algorithms\Official\ProcessVariantsAlgorithm;
 use SpectoDB\Algorithms\Official\DeviationDetectionAlgorithm;
+use SpectoDB\Core\Analysis\AlgorithmRegistry;
 
 $config = require __DIR__ . '/config.php';
 
@@ -26,26 +27,54 @@ try {
 
     $eventLog = $eventSource->load();
 
-    // Directly-Follows Graph analysis
-    $dfgAlgorithm = new DirectlyFollowsAlgorithm();
-    $dfgResult = $dfgAlgorithm->analyze($eventLog);
+    $registry = new AlgorithmRegistry();
 
-    $transitions = $dfgResult->get('transitions', []);
-
-    // Process statistics
-    $statisticsAlgorithm = new StatisticsAlgorithm(
-        $config['analysis']['success_events'] ?? [],
-        $config['analysis']['failure_events'] ?? []
+    $registry->register(
+        'directly_follows',
+        new DirectlyFollowsAlgorithm()
     );
 
-    $statisticsResult = $statisticsAlgorithm->analyze($eventLog);
+    $registry->register(
+        'statistics',
+        new StatisticsAlgorithm(
+            $config['analysis']['success_events'] ?? [],
+            $config['analysis']['failure_events'] ?? []
+        )
+    );
 
-    $stats = $statisticsResult->getData();
+    $registry->register(
+        'variants',
+        new ProcessVariantsAlgorithm()
+    );
 
-    $variantsAlgorithm = new ProcessVariantsAlgorithm();
-    $variantsResult = $variantsAlgorithm->analyze($eventLog);
+    $registry->register(
+        'deviations',
+        new DeviationDetectionAlgorithm()
+    );
 
-    $variants = $variantsResult->getData();
+    $dfgResult = $registry
+    ->get('directly_follows')
+    ->analyze($eventLog);
+
+$statisticsResult = $registry
+    ->get('statistics')
+    ->analyze($eventLog);
+
+$variantsResult = $registry
+    ->get('variants')
+    ->analyze($eventLog);
+
+$deviationResult = $registry
+    ->get('deviations')
+    ->analyze($eventLog);
+
+$transitions = $dfgResult->get('transitions', []);
+$stats = $statisticsResult->getData();
+$variants = $variantsResult->getData();
+$deviations = $deviationResult->getData();
+
+$eventLabels = array_keys($stats['event_counts']);
+$eventValues = array_values($stats['event_counts']);
 
     $deviationAlgorithm = new DeviationDetectionAlgorithm();
     $deviationResult = $deviationAlgorithm->analyze($eventLog);
