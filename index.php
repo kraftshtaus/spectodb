@@ -4,13 +4,22 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/vendor/autoload.php';
 
+use SpectoDB\Algorithms\Official\BottleneckDetectionAlgorithm;
+use SpectoDB\Algorithms\Official\CycleReworkDetectionAlgorithm;
+use SpectoDB\Algorithms\Official\DeviationDetectionAlgorithm;
 use SpectoDB\Algorithms\Official\DirectlyFollowsAlgorithm;
+use SpectoDB\Algorithms\Official\DurationAnalysisAlgorithm;
+use SpectoDB\Algorithms\Official\FrequencyHeatmapAlgorithm;
+use SpectoDB\Algorithms\Official\ProcessVariantsAlgorithm;
+use SpectoDB\Algorithms\Official\ResourceHandoverAlgorithm;
+use SpectoDB\Algorithms\Official\SlaBreachDetectionAlgorithm;
+use SpectoDB\Algorithms\Official\StartEndDiscoveryAlgorithm;
 use SpectoDB\Algorithms\Official\StatisticsAlgorithm;
+use SpectoDB\Algorithms\Official\ThroughputAnalysisAlgorithm;
+
+use SpectoDB\Core\Analysis\AlgorithmRegistry;
 use SpectoDB\Core\Database\Database;
 use SpectoDB\Core\Database\DatabaseEventSource;
-use SpectoDB\Algorithms\Official\ProcessVariantsAlgorithm;
-use SpectoDB\Algorithms\Official\DeviationDetectionAlgorithm;
-use SpectoDB\Core\Analysis\AlgorithmRegistry;
 
 $config = require __DIR__ . '/config.php';
 
@@ -158,7 +167,7 @@ $eventValues = array_values($stats['event_counts']);
 
         <section class="dashboard-grid">
 
-            <!-- KEY INDICATORS -->
+ <!-- Key Indicators -->
 
             <div class="panel indicators-panel">
 
@@ -205,7 +214,7 @@ $eventValues = array_values($stats['event_counts']);
 
             </div>
 
-            <!-- EVENT FREQUENCY -->
+<!-- Event Frequency -->
 
             <div class="panel">
 
@@ -220,7 +229,7 @@ $eventValues = array_values($stats['event_counts']);
 
             </div>
 
-            <!-- SUCCESS / FAILURE -->
+<!-- SUCCESS / FAILURE -->
 
             <div class="panel wide-panel">
 
@@ -235,7 +244,7 @@ $eventValues = array_values($stats['event_counts']);
 
             </div>
 
-            <!-- PROBLEM AREAS -->
+<!-- Problem Areas -->
 
             <div class="panel">
 

@@ -11,7 +11,8 @@ final class Event
     public function __construct(
         private string|int $caseId,
         private string $activity,
-        private DateTimeImmutable $timestamp
+        private DateTimeImmutable $timestamp,
+        private array $attributes = []
     ) {
     }
 
@@ -28,5 +29,22 @@ final class Event
     public function getTimestamp(): DateTimeImmutable
     {
         return $this->timestamp;
+    }
+
+    public function getAttributes(): array
+    {
+        return $this->attributes;
+    }
+
+    public function getAttribute(
+        string $name,
+        mixed $default = null
+    ): mixed {
+        return $this->attributes[$name] ?? $default;
+    }
+
+    public function hasAttribute(string $name): bool
+    {
+        return array_key_exists($name, $this->attributes);
     }
 }

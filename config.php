@@ -17,6 +17,8 @@ return [
     'timestamp' => 'created_at',
     ],
 
+    'attributes' => [],
+
     'analysis' => [
     'success_events' => [
         'payment_success',
@@ -24,6 +26,10 @@ return [
 
     'failure_events' => [
         'payment_failed',
+    ],
+
+    'sla' => [
+        'max_case_duration_seconds' => 600,
     ],
 ],
 ];
