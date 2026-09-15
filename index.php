@@ -2,8 +2,6 @@
 
 declare(strict_types=1);
 
-require_once __DIR__ . '/vendor/autoload.php';
-
 use SpectoDB\Algorithms\Official\BottleneckDetectionAlgorithm;
 use SpectoDB\Algorithms\Official\CycleReworkDetectionAlgorithm;
 use SpectoDB\Algorithms\Official\DeviationDetectionAlgorithm;
@@ -16,19 +14,29 @@ use SpectoDB\Algorithms\Official\SlaBreachDetectionAlgorithm;
 use SpectoDB\Algorithms\Official\StartEndDiscoveryAlgorithm;
 use SpectoDB\Algorithms\Official\StatisticsAlgorithm;
 use SpectoDB\Algorithms\Official\ThroughputAnalysisAlgorithm;
-
 use SpectoDB\Core\Analysis\AlgorithmRegistry;
-use SpectoDB\Core\Database\Database;
 use SpectoDB\Core\Database\DatabaseEventSource;
+use SpectoDB\Core\Database\DatabaseManager;
 
-$config = require __DIR__ . '/config.php';
+session_start();
+
+require_once __DIR__ . '/vendor/autoload.php';
+
+// Configuration
+$defaultConfig = require __DIR__ . '/config.php';
+
+$config = $_SESSION['spectodb_config']
+    ?? $defaultConfig;
 
 try {
-    // Database connection
-    $database = new Database($config['db']);
-    $pdo = $database->getConnection();
+    // Database
+    $databaseManager = new DatabaseManager();
 
-    // Build EventLog from the configured database source
+    $pdo = $databaseManager->connect(
+        $config['db']
+    );
+
+    // Event log
     $eventSource = new DatabaseEventSource(
         $pdo,
         $config['mapping']
@@ -36,6 +44,7 @@ try {
 
     $eventLog = $eventSource->load();
 
+    // Algorithms
     $registry = new AlgorithmRegistry();
 
     $registry->register(
@@ -61,52 +70,155 @@ try {
         new DeviationDetectionAlgorithm()
     );
 
-    $dfgResult = $registry
-    ->get('directly_follows')
-    ->analyze($eventLog);
+    $registry->register(
+        'bottlenecks',
+        new BottleneckDetectionAlgorithm()
+    );
 
-$statisticsResult = $registry
-    ->get('statistics')
-    ->analyze($eventLog);
+    $registry->register(
+        'duration',
+        new DurationAnalysisAlgorithm()
+    );
 
-$variantsResult = $registry
-    ->get('variants')
-    ->analyze($eventLog);
+    $registry->register(
+        'throughput',
+        new ThroughputAnalysisAlgorithm()
+    );
 
-$deviationResult = $registry
-    ->get('deviations')
-    ->analyze($eventLog);
+    $registry->register(
+        'cycle_rework',
+        new CycleReworkDetectionAlgorithm()
+    );
 
-$transitions = $dfgResult->get('transitions', []);
-$stats = $statisticsResult->getData();
-$variants = $variantsResult->getData();
-$deviations = $deviationResult->getData();
+    $registry->register(
+        'sla',
+        new SlaBreachDetectionAlgorithm(
+            $config['analysis']['sla']['max_case_duration_seconds']
+                ?? 3600
+        )
+    );
 
-$eventLabels = array_keys($stats['event_counts']);
-$eventValues = array_values($stats['event_counts']);
+    $registry->register(
+        'start_end',
+        new StartEndDiscoveryAlgorithm()
+    );
 
-    $deviationAlgorithm = new DeviationDetectionAlgorithm();
-    $deviationResult = $deviationAlgorithm->analyze($eventLog);
+    $registry->register(
+        'frequency_heatmap',
+        new FrequencyHeatmapAlgorithm()
+    );
 
-    $deviations = $deviationResult->getData();
+    $registry->register(
+        'resource_handover',
+        new ResourceHandoverAlgorithm()
+    );
 
-    // Dashboard chart data
-    $eventLabels = array_keys($stats['event_counts']);
-    $eventValues = array_values($stats['event_counts']);
+    // Run algorithms
+    $analysisResults = [];
+
+    foreach ($registry->all() as $id => $algorithm) {
+        $analysisResults[$id] = $algorithm->analyze(
+            $eventLog
+        );
+    }
+
+    // Results
+    $transitions = $analysisResults['directly_follows']
+        ->get('transitions', []);
+
+    $stats = $analysisResults['statistics']
+        ->getData();
+
+    $variants = $analysisResults['variants']
+        ->getData();
+
+    $deviations = $analysisResults['deviations']
+        ->getData();
+
+    $bottlenecks = $analysisResults['bottlenecks']
+        ->getData();
+
+    $duration = $analysisResults['duration']
+        ->getData();
+
+    $throughput = $analysisResults['throughput']
+        ->getData();
+
+    $cycles = $analysisResults['cycle_rework']
+        ->getData();
+
+    $sla = $analysisResults['sla']
+        ->getData();
+
+    $startEnd = $analysisResults['start_end']
+        ->getData();
+
+    $heatmap = $analysisResults['frequency_heatmap']
+        ->getData();
+
+    $handover = $analysisResults['resource_handover']
+        ->getData();
+
+    // Charts
+    $eventLabels = array_keys(
+        $stats['event_counts'] ?? []
+    );
+
+    $eventValues = array_values(
+        $stats['event_counts'] ?? []
+    );
 
 } catch (Throwable $e) {
-    die('Error: ' . htmlspecialchars($e->getMessage(), ENT_QUOTES, 'UTF-8'));
+    http_response_code(500);
+
+    die(
+        'SpectoDB Error: '
+        . htmlspecialchars(
+            $e->getMessage(),
+            ENT_QUOTES,
+            'UTF-8'
+        )
+    );
 }
+
+// Page
+$activePage = 'overview';
+
+$pageTitle = 'Overview';
+
+$pageSubtitle =
+    'Process mining and database analysis dashboard';
+
+$databaseName = htmlspecialchars(
+    $config['db']['dbname']
+        ?? ($config['db']['path'] ?? 'Database'),
+    ENT_QUOTES,
+    'UTF-8'
+);
+
+$topbarRight =
+    '<div class="db-selector">'
+    . $databaseName
+    . '</div>';
+
 ?>
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>SpectoDB - Process Analytics</title>
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
-    <link rel="stylesheet" href="assets/css/style.css">
+    <title>SpectoDB - Overview</title>
+
+    <link
+        rel="stylesheet"
+        href="assets/css/style.css"
+    >
 
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
@@ -115,59 +227,15 @@ $eventValues = array_values($stats['event_counts']);
 
 <div class="app-layout">
 
-    <aside class="sidebar">
-
-        <div class="brand">
-            <div class="brand-icon">S</div>
-
-            <div>
-                <h2>SpectoDB</h2>
-                <span>Process intelligence</span>
-            </div>
-        </div>
-
-        <nav class="menu">
-            <a class="active" href="#">Analytics</a>
-            <a href="#">Transactions</a>
-            <a href="#">Process Graph</a>
-            <a href="#">SQL Queries</a>
-            <a href="#">Problem Areas</a>
-            <a href="#">Settings</a>
-        </nav>
-
-        <div class="user-box">
-            <div class="avatar">A</div>
-
-            <div>
-                <strong>Admin</strong>
-                <span>System user</span>
-            </div>
-        </div>
-
-    </aside>
+    <?php require __DIR__ . '/partials/sidebar.php'; ?>
 
     <main class="main">
 
-        <header class="topbar">
-
-            <div>
-                <h1>Analytics</h1>
-                <p>Process mining and database analysis dashboard</p>
-            </div>
-
-            <div class="db-selector">
-                <?= htmlspecialchars(
-                    $config['db']['dbname'] ?? 'Database',
-                    ENT_QUOTES,
-                    'UTF-8'
-                ) ?>
-            </div>
-
-        </header>
+        <?php require __DIR__ . '/partials/topbar.php'; ?>
 
         <section class="dashboard-grid">
 
- <!-- Key Indicators -->
+            <!-- Key Indicators -->
 
             <div class="panel indicators-panel">
 
@@ -180,7 +248,11 @@ $eventValues = array_values($stats['event_counts']);
 
                     <div class="circle-stat">
                         <div class="circle">
-                            <?= $stats['total_cases'] ?>
+                            <?= htmlspecialchars(
+                                (string) ($stats['total_cases'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
                         </div>
 
                         <span>Total cases</span>
@@ -188,7 +260,11 @@ $eventValues = array_values($stats['event_counts']);
 
                     <div class="circle-stat">
                         <div class="circle">
-                            <?= $stats['success_cases'] ?>
+                            <?= htmlspecialchars(
+                                (string) ($stats['success_cases'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
                         </div>
 
                         <span>Successful</span>
@@ -196,7 +272,11 @@ $eventValues = array_values($stats['event_counts']);
 
                     <div class="circle-stat">
                         <div class="circle">
-                            <?= $stats['failed_cases'] ?>
+                            <?= htmlspecialchars(
+                                (string) ($stats['failed_cases'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
                         </div>
 
                         <span>Failed</span>
@@ -204,7 +284,11 @@ $eventValues = array_values($stats['event_counts']);
 
                     <div class="circle-stat">
                         <div class="circle">
-                            <?= $stats['success_rate'] ?>%
+                            <?= htmlspecialchars(
+                                (string) ($stats['success_rate'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>%
                         </div>
 
                         <span>Success rate</span>
@@ -214,7 +298,7 @@ $eventValues = array_values($stats['event_counts']);
 
             </div>
 
-<!-- Event Frequency -->
+            <!-- Event Frequency -->
 
             <div class="panel">
 
@@ -229,7 +313,7 @@ $eventValues = array_values($stats['event_counts']);
 
             </div>
 
-<!-- SUCCESS / FAILURE -->
+            <!-- Success / Failure -->
 
             <div class="panel wide-panel">
 
@@ -244,7 +328,7 @@ $eventValues = array_values($stats['event_counts']);
 
             </div>
 
-<!-- Problem Areas -->
+            <!-- Problem Areas -->
 
             <div class="panel">
 
@@ -259,7 +343,11 @@ $eventValues = array_values($stats['event_counts']);
                         <strong>Failed cases</strong>
 
                         <span>
-                            <?= $stats['failed_cases'] ?>
+                            <?= htmlspecialchars(
+                                (string) ($stats['failed_cases'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
                             failed cases detected
                         </span>
                     </div>
@@ -268,26 +356,104 @@ $eventValues = array_values($stats['event_counts']);
                         <strong>Success rate</strong>
 
                         <span>
-                            <?= $stats['success_rate'] ?>%
+                            <?= htmlspecialchars(
+                                (string) ($stats['success_rate'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>%
                             overall process success
                         </span>
                     </div>
 
                     <div class="problem-item info">
                         <strong>Process variants</strong>
+
                         <span>
-                            <?= $variants['total_variants'] ?>
+                            <?= htmlspecialchars(
+                                (string) ($variants['total_variants'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
                             process variants detected
                         </span>
                     </div>
 
                     <div class="problem-item warning">
                         <strong>Process deviations</strong>
+
                         <span>
-                        <?= $deviations['affected_cases'] ?>
-                        cases deviate from the main process
+                            <?= htmlspecialchars(
+                                (string) ($deviations['affected_cases'] ?? 0),
+                                ENT_QUOTES,
+                                'UTF-8'
+                            ) ?>
+                            cases deviate from the main process
                         </span>
                     </div>
+
+                    <?php if (($bottlenecks['bottleneck'] ?? null) !== null): ?>
+
+                        <div class="problem-item warning">
+                            <strong>Potential bottleneck</strong>
+
+                            <span>
+                                <?= htmlspecialchars(
+                                    (string) (
+                                        $bottlenecks['bottleneck']['from']
+                                        ?? ''
+                                    ),
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+
+                                →
+
+                                <?= htmlspecialchars(
+                                    (string) (
+                                        $bottlenecks['bottleneck']['to']
+                                        ?? ''
+                                    ),
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                            </span>
+                        </div>
+
+                    <?php endif; ?>
+
+                    <?php if (($sla['breach_count'] ?? 0) > 0): ?>
+
+                        <div class="problem-item danger">
+                            <strong>SLA breaches</strong>
+
+                            <span>
+                                <?= htmlspecialchars(
+                                    (string) $sla['breach_count'],
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                                cases exceed SLA
+                            </span>
+                        </div>
+
+                    <?php endif; ?>
+
+                    <?php if (($cycles['affected_cases'] ?? 0) > 0): ?>
+
+                        <div class="problem-item warning">
+                            <strong>Rework detected</strong>
+
+                            <span>
+                                <?= htmlspecialchars(
+                                    (string) $cycles['affected_cases'],
+                                    ENT_QUOTES,
+                                    'UTF-8'
+                                ) ?>
+                                cases contain repeated activities
+                            </span>
+                        </div>
+
+                    <?php endif; ?>
 
                 </div>
 
@@ -300,12 +466,24 @@ $eventValues = array_values($stats['event_counts']);
 </div>
 
 <script>
-    window.dashboardData = {
-        successCases: <?= json_encode($stats['success_cases']) ?>,
-        failedCases: <?= json_encode($stats['failed_cases']) ?>,
-        eventLabels: <?= json_encode($eventLabels) ?>,
-        eventValues: <?= json_encode($eventValues) ?>
-    };
+window.dashboardData = {
+    successCases: <?= json_encode(
+        $stats['success_cases'] ?? 0
+    ) ?>,
+
+    failedCases: <?= json_encode(
+        $stats['failed_cases'] ?? 0
+    ) ?>,
+
+    eventLabels: <?= json_encode(
+        $eventLabels,
+        JSON_UNESCAPED_UNICODE
+    ) ?>,
+
+    eventValues: <?= json_encode(
+        $eventValues
+    ) ?>
+};
 </script>
 
 <script src="assets/js/app.js"></script>
