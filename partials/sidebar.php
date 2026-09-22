@@ -22,40 +22,25 @@ $activePage = $activePage ?? '';
 
     <nav class="menu">
 
-        <a
-            href="index.php"
-            class="<?= $activePage === 'overview' ? 'active' : '' ?>"
-        >
-            Overview
-        </a>
+<a href="index.php" class="<?= $activePage === 'overview' ? 'active' : '' ?>">
+    Overview
+</a>
 
-        <a
-            href="process-graph.php"
-            class="<?= $activePage === 'process-graph' ? 'active' : '' ?>"
-        >
-            Process Graph
-        </a>
+<a href="process-graph.php" class="<?= $activePage === 'process-graph' ? 'active' : '' ?>">
+    Process Graph
+</a>
 
-        <a
-            href="#"
-            class="<?= $activePage === 'variants' ? 'active' : '' ?>"
-        >
-            Variants
-        </a>
+<a href="#" class="<?= $activePage === 'variants' ? 'active' : '' ?>" >
+    Variants
+</a>
 
-        <a
-            href="#"
-            class="<?= $activePage === 'diagnostics' ? 'active' : '' ?>"
-        >
-            Diagnostics
-        </a>
+<a href="diagnostics.php" class="<?= $activePage === 'diagnostics' ? 'active' : '' ?>" >
+    Diagnostics
+</a>
 
-        <a
-            href="database.php"
-            class="<?= $activePage === 'database' ? 'active' : '' ?>"
-        >
-            Database
-        </a>
+<a href="database.php" class="<?= $activePage === 'database' ? 'active' : '' ?>" >
+    Database
+</a>
 
         <a
             href="#"

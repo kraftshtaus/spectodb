@@ -236,6 +236,10 @@
     font-size: 12px;
 }
 
+[hidden] {
+    display: none !important;
+}
+
 .database-message.success {
     border: 1px solid #315842;
 
